@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>AI System & VRM Integrated Studio v2.12.18</title>
+<style>
+  :root {
+    --bg-glass: rgba(18, 20, 28, 0.65);
+    --bg-panel: rgba(18, 20, 28, 0.85);
+    --border-glass: rgba(255, 255, 255, 0.15);
+    --text-main: #F3F4F6;
+    --text-muted: #9CA3AF;
+    --accent-primary: #3ED6C4;
+    --accent-secondary: #5B8CFF;
+    --accent-warn: #FBBF24;
+    --accent-danger: #FB7185;
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-pill: 9999px;
+    --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #eef2f5; font-family: var(--font-ui); color: var(--text-main); }
+  
+  canvas { display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; touch-action: none; outline: none; }
+  
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+  .glass { background: var(--bg-glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border-glass); }
+
+  #toastBox { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { padding: 12px 20px; border-radius: var(--radius-pill); background: var(--bg-panel); backdrop-filter: blur(12px); font-size: 13px; font-weight: bold; opacity: 0; transform: translateY(-10px); transition: all 0.3s; border: 1px solid var(--border-glass); }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  #top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 50; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+  #status-pill { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: var(--radius-pill); pointer-events: auto; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: #555; transition: all 0.3s ease; }
+  .led.listening { background: var(--accent-primary); box-shadow: 0 0 12px var(--accent-primary); }
+  .led.thinking { background: var(--accent-warn); box-shadow: 0 0 12px var(--accent-warn); animation: pulse 1.5s infinite; }
+  .led.speaking { background: var(--accent-secondary); box-shadow: 0 0 12px var(--accent-secondary); animation: pulse 1s infinite; }
+  .led.live { background: var(--accent-danger); box-shadow: 0 0 12px var(--accent-danger); animation: pulse 0.8s infinite; }
+  #statusLabel { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; }
+
+  #vrm-ui-toggle { position: absolute; top: 16px; right: 16px; z-index: 101; background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-glass); padding: 8px 12px; cursor: pointer; border-radius: var(--radius-sm); font-weight: bold; pointer-events: auto; backdrop-filter: blur(10px); }
+  #vrm-ui-container { position: absolute; top: 60px; right: 16px; width: 320px; background: var(--bg-panel); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(10px); transition: opacity 0.3s, transform 0.3s; z-index: 100; max-height: 85vh; overflow-y: auto; pointer-events: auto; }
+  #vrm-ui-container.hidden { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+  
+  .vrm-form-group { margin-bottom: 15px; }
+  .vrm-form-group label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: bold; color: var(--text-muted); }
+  .vrm-form-group input[type="file"] { width: 100%; font-size: 11px; margin-bottom: 5px; color: var(--text-main); }
+  
+  .list-box { border: 1px solid var(--border-glass); border-radius: 4px; background: rgba(0,0,0,0.3); padding: 4px; margin-bottom: 10px; max-height: 140px; overflow-y: auto; }
+  .list-title { font-size: 11px; font-weight: bold; color: var(--accent-primary); margin-bottom: 4px; padding-left: 4px; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px; }
+  .playlist-item { padding: 6px; border-bottom: 1px solid var(--border-glass); font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 4px; transition: background 0.2s; }
+  .playlist-item:last-child { border-bottom: none; }
+  .playlist-item.active { background: rgba(62, 214, 196, 0.3); font-weight: bold; }
+  .playlist-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .playlist-controls button { background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); color: #fff; border-radius: 4px; cursor: pointer; font-size: 10px; padding: 3px 6px; }
+  
+  .checkbox-group { display: flex; gap: 12px; font-size: 11px; align-items: center; margin-bottom: 8px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 4px; }
+  .btn-vrm-danger { background: transparent; border: 1px solid var(--accent-danger); color: var(--accent-danger); padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%; margin-top: 4px;}
+  .btn-sys-small { background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); color: var(--text-main); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+  .local-info { font-size: 11px; color: var(--accent-primary); margin-top: 4px; display: block; }
+
+  #dpad-widget { position: absolute; bottom: 160px; right: 16px; z-index: 60; pointer-events: none; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  #dpad-panel { pointer-events: auto; background: rgba(18, 20, 28, 0.6); padding: 8px; border-radius: 12px; border: 1px solid var(--border-glass); backdrop-filter: blur(16px); display: flex; flex-direction: column; align-items: center; transition: opacity 0.3s, transform 0.3s; transform-origin: center; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  #dpad-panel.hidden { opacity: 0; transform: scale(0.5); pointer-events: none; }
+  #dpad-handle { width: 100%; text-align: center; font-size: 10px; color: var(--accent-primary); cursor: grab; padding-bottom: 8px; user-select: none; touch-action: none; font-weight: bold; letter-spacing: 0.1em; }
+  #dpad-container { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; }
+  .dpad-btn { pointer-events: auto; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 8px; color: var(--text-main); font-size: 16px; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: manipulation; }
+  .dpad-btn:active { background: rgba(255,255,255,0.2); transform: scale(0.95); }
+  #btn-up { grid-column: 2; grid-row: 1; } #btn-left { grid-column: 1; grid-row: 2; } #btn-jump { grid-column: 2; grid-row: 2; font-size: 10px; font-weight: bold; background: rgba(62,214,196,0.2); color: var(--accent-primary); } #btn-right { grid-column: 3; grid-row: 2; } #btn-down { grid-column: 2; grid-row: 3; }
+
+  #chat-wrapper { position: absolute; bottom: 90px; left: 16px; width: min(100% - 32px, 500px); height: calc(100vh - 200px); max-height: 40vh; z-index: 40; display: flex; flex-direction: column; gap: 8px; pointer-events: none; transition: opacity 0.3s; }
+  #chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 8px; pointer-events: auto; -webkit-overflow-scrolling: touch; }
+  .msg-bubble { max-width: 90%; padding: 10px 14px; border-radius: 16px; font-size: 13px; line-height: 1.5; word-break: break-word; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: auto; }
+  .msg-bubble.user { align-self: flex-end; background: rgba(255,255,255,0.95); color: #1a1a1a; border-bottom-right-radius: 4px; }
+  .msg-bubble.ai { align-self: flex-start; background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-glass); border-bottom-left-radius: 4px; backdrop-filter: blur(10px); }
+  .msg-bubble.thinking { background: rgba(255,255,255,0.1); color: var(--accent-primary); border: 1px dashed var(--accent-primary); animation: pulse 1.5s infinite; }
+  
+  #quick-replies { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; pointer-events: auto; -webkit-overflow-scrolling: touch; }
+  .qr-btn { padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); border-radius: var(--radius-pill); color: var(--text-main); font-size: 12px; white-space: nowrap; cursor: pointer; backdrop-filter: blur(8px); transition: background 0.2s; }
+  .qr-btn:hover { background: rgba(255,255,255,0.2); }
+
+  #input-bar { display: flex; gap: 8px; background: var(--bg-panel); padding: 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-glass); backdrop-filter: blur(12px); pointer-events: auto; }
+  #chat-input { flex: 1; background: transparent; border: none; color: var(--text-main); font-size: 14px; padding: 0 12px; outline: none; font-family: var(--font-ui); }
+  .send-btn { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; border: none; background: var(--accent-primary); color: #000; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  #live-wrapper { position: absolute; bottom: 90px; left: 16px; width: min(100% - 32px, 500px); max-height: 45vh; z-index: 40; display: none; flex-direction: column; gap: 12px; pointer-events: none; }
+  body.is-live #chat-wrapper { display: flex; opacity: 0.8; }
+  body.is-live #input-bar { display: none; }
+  body.is-live.show-captions #live-wrapper { display: flex; }
+  
+  #live-captions { background: var(--bg-panel); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; pointer-events: auto; min-height: 150px; }
+  .live-cap-bubble { font-size: 14px; line-height: 1.5; padding: 8px 12px; border-radius: 12px; max-width: 90%; word-break: break-word; white-space: pre-wrap; }
+  .live-cap-bubble.user { align-self: flex-end; background: rgba(59, 130, 246, 0.2); color: #93C5FD; border-bottom-right-radius: 4px; }
+  .live-cap-bubble.ai { align-self: flex-start; background: rgba(255, 255, 255, 0.1); color: #fff; border-bottom-left-radius: 4px; }
+
+  #bottom-dock { position: absolute; bottom: 24px; left: 16px; z-index: 90; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: var(--radius-pill); box-shadow: 0 8px 32px rgba(0,0,0,0.4); pointer-events: auto; }
+  .dock-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-glass); cursor: pointer; background: rgba(255,255,255,0.05); color: var(--text-main); font-size: 18px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+  .dock-btn:hover { background: rgba(255,255,255,0.15); }
+  #live-toggle-btn { padding: 0 20px; height: 40px; border-radius: var(--radius-pill); font-weight: bold; font-size: 14px; background: transparent; border: 2px solid var(--accent-danger); color: var(--accent-danger); cursor: pointer; transition: all 0.3s; }
+  #live-toggle-btn.on { background: var(--accent-danger); color: #fff; animation: live-pulse 2s infinite; }
+  
+  .side-panel { position: absolute; top: 0; left: 0; width: min(100%, 380px); height: 100%; background: var(--bg-panel); backdrop-filter: blur(20px); border-right: 1px solid var(--border-glass); z-index: 80; transform: translateX(-100%); transition: transform 0.3s; display: flex; flex-direction: column; pointer-events: auto; }
+  .side-panel.open { transform: translateX(0); }
+  .panel-header { padding: 16px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: bold; }
+  .close-btn { background: transparent; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
+  
+  .panel-content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 120px; display: flex; flex-direction: column; gap: 16px; }
+  
+  .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: var(--radius-sm); }
+  .tab-btn { flex: 1; padding: 8px 0; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 4px; color: var(--text-muted); }
+  .tab-btn.active { background: rgba(255,255,255,0.1); color: var(--text-main); }
+  .tab-pane { display: none; animation: fadeIn 0.3s; }
+  .tab-pane.active { display: block; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .form-group label { font-size: 12px; color: var(--text-muted); font-weight: bold; }
+  
+  .combo-box { display: flex; gap: 4px; }
+  .combo-box select { width: 40px; background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); color: var(--text-main); border-radius: var(--radius-sm); outline: none; cursor: pointer; }
+  .combo-box input { flex: 1; }
+
+  input[type="password"], input[type="text"], select, textarea { width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: var(--text-main); font-family: var(--font-ui); outline: none; font-size: 13px; }
+  .card { background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); padding: 12px; }
+  .card-title { font-size: 12px; color: var(--accent-primary); margin-bottom: 8px; font-weight: bold; }
+  .btn-sys { background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); color: var(--text-main); padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; width: 100%; margin-bottom: 8px; }
+
+  @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+  @keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.6); } 70% { box-shadow: 0 0 0 10px rgba(251, 113, 133, 0); } 100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3/lib/three-vrm.module.js",
+      "@pixiv/three-vrm-animation": "https://unpkg.com/@pixiv/three-vrm-animation@3/lib/three-vrm-animation.module.js"
+    }
+  }
+</script>
+</head>
+<body>
+
+  <div id="toastBox"></div>
+  <div id="top-bar">
+    <div id="status-pill" class="glass"><div id="statusLed" class="led listening"></div><span id="statusLabel">待機中</span></div>
+  </div>
+
+  <button id="vrm-ui-toggle">≡ 3D設定 <span style="font-size: 10px; background: var(--accent-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">v2.12.18</span></button>
+  <div id="vrm-ui-container" class="hidden">
+    <div class="vrm-form-group">
+      <label>1. VRMモデル読み込み</label>
+      <input type="file" id="vrm-input" accept=".vrm">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span class="local-info" id="vrm-local-info"></span>
+        <button id="btn-load-local-vrm" class="btn-sys-small" style="display:none; width:auto; padding:4px 8px; margin:0;">アバター呼出</button>
+      </div>
+    </div>
+    <div class="vrm-form-group">
+      <label>2. モーション追加 (VRMA)</label>
+      <input type="file" id="vrma-input" accept=".vrma" multiple>
+      <div class="list-box"><div class="list-title">📚 ライブラリ (登録済み)</div><div id="library-container"></div></div>
+      <div class="list-box" style="margin-top:12px;"><div class="list-title">🎬 プレイリスト (自動保存)</div><div id="playlist-container"></div></div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" id="chk-sequence" checked> 順番に再生</label>
+        <label><input type="checkbox" id="chk-loop" checked> ループ</label>
+      </div>
+      <button id="clear-lib-btn" class="btn-vrm-danger">全ライブラリ削除</button>
+    </div>
+    <div style="font-size: 11px; color: var(--accent-primary); font-weight:bold;" id="vrm-status">モデル未読込</div>
+  </div>
+
+  <div id="dpad-widget">
+    <div id="dpad-panel" class="hidden">
+      <div id="dpad-handle">::: ドラッグで移動 :::</div>
+      <div id="dpad-container">
+        <div class="dpad-btn" id="btn-up">↑</div><div class="dpad-btn" id="btn-left">←</div><div class="dpad-btn" id="btn-jump">JMP</div><div class="dpad-btn" id="btn-right">→</div><div class="dpad-btn" id="btn-down">↓</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat-wrapper">
+    <div id="chat-history"></div>
+    <div id="quick-replies"></div>
+    <div id="input-bar">
+      <input type="text" id="chat-input" placeholder="AIに指示を出す..." autocomplete="off" maxlength="200">
+      <button id="send-btn" class="send-btn">➤</button>
+    </div>
+  </div>
+
+  <div id="live-wrapper">
+    <div id="live-captions"></div>
+  </div>
+
+  <div id="bottom-dock" class="glass">
+    <button class="dock-btn" id="settings-btn" title="システム設定">⚙️</button>
+    <button class="dock-btn" id="dpad-toggle" title="アクションパッド切替">🕹️</button>
+    <div style="width: 1px; height: 24px; background: var(--border-glass); margin: 0 4px;"></div>
+    <button id="live-toggle-btn"><span>● LIVE API</span></button>
+  </div>
+  
+  <div class="side-panel" id="settings-panel">
+    <div class="panel-header"><span>⚙️ システム設定</span><button class="close-btn" id="close-settings">×</button></div>
+    <div class="panel-content">
+      <div class="tabs">
+        <div class="tab-btn active" data-target="tab-general">一般</div>
+        <div class="tab-btn" data-target="tab-voice">音声・Live</div>
+        <div class="tab-btn" data-target="tab-system">記憶管理</div>
+      </div>
+      
+      <div class="tab-pane active" id="tab-general">
+        <div class="form-group"><label>Gemini APIキー</label><input type="password" id="api-key" placeholder="AI Studioで取得したキー"></div>
+        <div class="card">
+          <div class="card-title">🤖 APIモデル設定</div>
+          <div class="form-group">
+            <label>通常チャット用モデル</label>
+            <div class="combo-box">
+                <select onchange="const inp=document.getElementById('chat-model-input'); inp.value=this.value; inp.dispatchEvent(new Event('change'));">
+                    <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                    <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+                    <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                </select>
+                <input type="text" id="chat-model-input" value="gemini-3.1-flash-lite">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="tab-pane" id="tab-voice">
+        <div class="card"><div class="card-title" style="color: var(--accent-danger);">● LIVEモード専用設定</div>
+          <div class="form-group">
+            <label>Live会話用モデル (自由入力可)</label>
+            <div class="combo-box">
+                <select onchange="const inp=document.getElementById('live-model-input'); inp.value=this.value; inp.dispatchEvent(new Event('change'));">
+                    <option value="gemini-2.5-flash-native-audio-preview-12-2025">gemini-2.5-flash-native-audio-preview-12-2025</option>
+                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+                    <option value="gemini-3.1-flash-live-preview">gemini-3.1-flash-live-preview</option>
+                </select>
+                <input type="text" id="live-model-input" value="gemini-2.5-flash-native-audio-preview-12-2025">
+            </div>
+          </div>
+          <div class="form-group"><label>Live用音声 (声質)</label><select id="live-voice-select"><option value="Aoede">Aoede (女性的)</option><option value="Kore">Kore (明るい)</option><option value="Puck">Puck (中性的)</option></select></div>
+          <label style="font-size:11px; display:flex; align-items:center; gap:4px; margin-top:12px; color:var(--accent-primary);">
+            <input type="checkbox" id="show-live-captions"> 📝 生データ字幕(STT)を表示
+          </label>
+        </div>
+        <div class="card"><div class="card-title">💬 通常モード TTS設定</div>
+          <label style="font-size:11px; display:flex; align-items:center; gap:4px; margin-bottom:8px;"><input type="checkbox" id="use-gemini-tts" checked> 🤖 Gemini TTSを使う</label>
+          <div class="form-group">
+            <label>Gemini TTS用モデル</label>
+            <div class="combo-box">
+                <select onchange="const inp=document.getElementById('tts-model-input'); inp.value=this.value; inp.dispatchEvent(new Event('change'));">
+                    <option value="gemini-2.5-flash-preview-tts">gemini-2.5-flash-preview-tts</option>
+                    <option value="gemini-3.1-flash-tts-preview">gemini-3.1-flash-tts-preview</option>
+                </select>
+                <input type="text" id="tts-model-input" value="gemini-2.5-flash-preview-tts">
+            </div>
+          </div>
+          <div class="form-group"><label>Gemini TTS 音声(声質)</label><select id="tts-voice-select"><option value="Aoede">Aoede</option><option value="Kore">Kore</option><option value="Puck">Puck</option></select></div>
+          <div class="form-group" style="margin-top:12px; border-top:1px solid var(--border-glass); padding-top:12px;"><label>代替ブラウザ音声(Web Speech)</label><select id="voice-select"></select></div>
+        </div>
+      </div>
+      
+      <div class="tab-pane" id="tab-system">
+        <div class="card"><div class="card-title">📝 キャラクター人格 (JSON)</div><textarea id="json-persona" rows="4" style="width:100%; padding:8px; font-size:12px; background:rgba(0,0,0,0.3); color:#fff;"></textarea><button class="btn-sys" id="btn-save-persona" style="margin-top:8px;">適用</button><div style="font-size:11px; margin-top:8px;">ファイル読込: <input type="file" id="persona-file" accept=".json"></div></div>
+        <div class="card"><div class="card-title">🧠 メモリ・ログ管理</div><button class="btn-sys" id="btn-export-memory">長期記憶をダウンロード</button><div style="font-size:11px; margin-bottom:12px;">記憶復元: <input type="file" id="memory-file" accept=".json"></div><button class="btn-sys" id="btn-export-log">会話ログをダウンロード</button><button class="btn-sys" id="btn-clear-memory" style="border-color:var(--accent-danger); color:var(--accent-danger);">記憶・ログをリセット</button></div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+
+window.showToast = (msg, isError=false) => {
+  const box = document.getElementById('toastBox'); const t = document.createElement('div'); t.className = 'toast';
+  t.style.borderLeft = isError ? '4px solid var(--accent-danger)' : '4px solid var(--accent-primary)';
+  t.innerText = msg; box.appendChild(t); requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+};
+
+window.__utterances = []; 
+
+const DBManager = {
+  db: null,
+  async init() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('VRMStudioDB_v2', 1);
+      req.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' }); };
+      req.onsuccess = (e) => { this.db = e.target.result; resolve(); }; req.onerror = () => reject(req.error);
+    });
+  },
+  async saveFile(id, name, data, type) { return new Promise((resolve, reject) => { const tx = this.db.transaction('files', 'readwrite'); tx.objectStore('files').put({ id, name, data, type }); tx.oncomplete = resolve; tx.onerror = reject; }); },
+  async getFile(id) { return new Promise((resolve, reject) => { const req = this.db.transaction('files', 'readonly').objectStore('files').get(id); req.onsuccess = () => resolve(req.result); req.onerror = reject; }); },
+  async getAll(type) { return new Promise((resolve, reject) => { const req = this.db.transaction('files', 'readonly').objectStore('files').getAll(); req.onsuccess = () => resolve(req.result.filter(item => item.type === type)); req.onerror = reject; }); },
+  async deleteFile(id) { return new Promise((resolve, reject) => { const tx = this.db.transaction('files', 'readwrite'); tx.objectStore('files').delete(id); tx.oncomplete = resolve; tx.onerror = reject; }); }
+};
+
+class GlobalEventBus extends EventTarget {}
+const eventBus = new GlobalEventBus();
+
+// --------------------------------------------------------
+// [LLMModule] LLM通信, Live API, TTS, キャプション管理, STT・FlashLite並行処理
+// --------------------------------------------------------
+class LLMModule {
+  constructor(bus) {
+    this.bus = bus;
+    this.chatHistory = JSON.parse(localStorage.getItem('vrm_chatLog') || '[]');
+    this.relationMemory = JSON.parse(localStorage.getItem('vrm_memory') || '{}');
+    this.persona = JSON.parse(localStorage.getItem('vrm_persona') || '{"name":"AI","personality":"フレンドリー"}');
+    
+    this.apiKeyInput = document.getElementById('api-key');
+    this.historyDiv = document.getElementById('chat-history');
+    this.qrDiv = document.getElementById('quick-replies');
+    this.chatInput = document.getElementById('chat-input');
+    this.liveCaptions = document.getElementById('live-captions');
+    
+    this.currentLiveUserCaption = null;
+    this.currentLiveAiCaption = null;
+    this.nextAudioTime = 0;
+    this.isLiveMode = false;
+    this.isConnectingLive = false; 
+    this.liveAudioNodes = [];
+    this.activeTtsNodes = []; 
+    this.silenceTimer = null; 
+
+    // LiveAPIからの純正テキストログを保持するバッファ
+    this.currentAiResponseBuffer = '';
+    
+    // ローカルSTTエンジン
+    this.recognition = null;
+    this.initSTT();
+
+    document.getElementById('send-btn').addEventListener('click', () => this.handleSend());
+    this.chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleSend(); });
+    this.bus.addEventListener('user-message', (e) => this.callAPI(e.detail.text, e.detail.vrmaList));
+    document.getElementById('live-toggle-btn').addEventListener('click', () => this.toggleLiveMode());
+
+    this.sharedAudioCtx = null;
+    this.initSettingsUI(); this.renderHistory();
+  }
+
+  initSTT() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    this.recognition = new SR();
+    this.recognition.lang = 'ja-JP';
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    
+    this.recognition.onresult = (e) => {
+        if (!this.isLiveMode) return;
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+            else interimTranscript += e.results[i][0].transcript;
+        }
+        
+        // オプションがONの時のみ生データを字幕表示
+        if (document.getElementById('show-live-captions').checked) {
+            if (interimTranscript) this.updateLiveCaptionStreaming('user', interimTranscript, true);
+            if (finalTranscript) this.updateLiveCaptionStreaming('user', finalTranscript, false);
+        }
+
+        if (finalTranscript) {
+            this.processWithLiteModel(finalTranscript);
+        }
+    };
+    
+    this.recognition.onend = () => {
+        if (this.isLiveMode && this.recognition) { try { this.recognition.start(); } catch(e){} }
+    };
+    this.recognition.onerror = (e) => { console.warn("STT Error:", e.error); };
+  }
+
+  async processWithLiteModel(text) {
+      const apiKey = this.apiKeyInput.value.trim();
+      if (!apiKey || !text) return;
+      
+      this.bus.dispatchEvent(new CustomEvent('request-vrma-list', { 
+          detail: { 
+              callback: async (vrmaList) => {
+                  const sysPrompt = `あなたはAIアシスタントの裏方（思考・記録係）です。ユーザーの音声認識の生データが入力されます。
+1. 文脈からアバターのモーション（[${vrmaList.join(', ')}, jump, think, none]）を判定してください。
+2. 感情（neutral, happy, angry, sad, relaxed）を判定してください。
+3. 認識の誤字脱字や不要なフィラー（えーと等）を除去し、綺麗なユーザー側の会話ログのテキストに整理してください。
+出力は以下のJSONのみにしてください。
+{"action": "モーション名", "emotion": "感情", "cleaned_text": "整理されたユーザーの言葉"}`;
+
+                  try {
+                      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
+                          method: 'POST', headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify({ 
+                              systemInstruction: { parts: [{ text: sysPrompt }] }, 
+                              contents: [{ role: 'user', parts: [{ text: text }] }], 
+                              generationConfig: { responseMimeType: 'application/json' } 
+                          })
+                      });
+                      if (!res.ok) return;
+                      const data = await res.json(); 
+                      const json = JSON.parse(data.candidates[0].content.parts[0].text);
+                      
+                      if (json.action && json.action !== 'none' || json.emotion && json.emotion !== 'neutral') {
+                          this.bus.dispatchEvent(new CustomEvent('llm-response', { 
+                              detail: { action: json.action || 'none', emotion: json.emotion || 'neutral', playSource: 'stt-lite' } 
+                          }));
+                      }
+                      
+                      this.chatHistory.push({ role: 'user', content: json.cleaned_text || text });
+                      if(this.chatHistory.length > 50) this.chatHistory = this.chatHistory.slice(-50);
+                      localStorage.setItem('vrm_chatLog', JSON.stringify(this.chatHistory));
+                      this.renderHistory();
+
+                  } catch(e) { console.warn("Lite Model Background Error:", e); }
+              }
+          } 
+      }));
+  }
+
+  updateLiveCaptionStreaming(role, text, isInterim = false) {
+      const container = document.getElementById('live-captions');
+      let targetEl = role === 'user' ? this.currentLiveUserCaption : this.currentLiveAiCaption;
+      
+      if (!targetEl) {
+          targetEl = document.createElement('div'); 
+          targetEl.className = `live-cap-bubble ${role}`;
+          targetEl.innerHTML = (role === 'user' ? '🎙️ ' : '') + '<span class="text-content"></span>';
+          container.appendChild(targetEl);
+          if (role === 'user') this.currentLiveUserCaption = targetEl; 
+          else this.currentLiveAiCaption = targetEl;
+      }
+      
+      const textSpan = targetEl.querySelector('.text-content'); 
+      if (isInterim) {
+          textSpan.textContent = (targetEl.dataset.finalText || '') + text;
+      } else {
+          const newFinal = (targetEl.dataset.finalText || '') + text + " ";
+          targetEl.dataset.finalText = newFinal;
+          textSpan.textContent = newFinal;
+      }
+      
+      container.scrollTop = container.scrollHeight; 
+      while (container.children.length > 20) container.removeChild(container.firstChild);
+  }
+
+  initSettingsUI() {
+    const bindStorage = (id, type) => {
+        const el = document.getElementById(id); const val = localStorage.getItem('vrm_' + id);
+        if(val !== null) { 
+            if(type === 'checkbox') el.checked = (val === 'true'); 
+            else el.value = val; 
+            const prevSelect = el.previousElementSibling;
+            if (prevSelect && prevSelect.tagName === 'SELECT') {
+                Array.from(prevSelect.options).forEach(opt => { if (opt.value === val) prevSelect.value = val; });
+            }
+        }
+        const saveFn = () => localStorage.setItem('vrm_' + id, type === 'checkbox' ? el.checked : el.value);
+        el.addEventListener('input', saveFn); el.addEventListener('change', saveFn);
+    };
+    ['chat-model-input', 'live-model-input', 'live-voice-select', 'tts-model-input', 'tts-voice-select'].forEach(id => bindStorage(id, 'text'));
+    bindStorage('use-gemini-tts', 'checkbox');
+    
+    bindStorage('show-live-captions', 'checkbox');
+    const updateCaptionUI = () => document.body.classList.toggle('show-captions', document.getElementById('show-live-captions').checked);
+    document.getElementById('show-live-captions').addEventListener('change', updateCaptionUI);
+    updateCaptionUI();
+
+    const savedKey = localStorage.getItem('vrm_apiKey'); if(savedKey) this.apiKeyInput.value = savedKey;
+    this.apiKeyInput.addEventListener('change', (e) => localStorage.setItem('vrm_apiKey', e.target.value));
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        e.target.classList.add('active'); document.getElementById(e.target.dataset.target).classList.add('active');
+      });
+    });
+
+    const populateVoices = () => {
+      if (!window.speechSynthesis) return; this.voices = window.speechSynthesis.getVoices();
+      const vs = document.getElementById('voice-select'); vs.innerHTML = '';
+      this.voices.forEach((v, i) => { const o = document.createElement('option'); o.textContent = `${v.name} (${v.lang})`; o.value = i; vs.appendChild(o); });
+      bindStorage('voice-select', 'text');
+    };
+    populateVoices(); if(window.speechSynthesis) window.speechSynthesis.onvoiceschanged = populateVoices;
+
+    document.getElementById('json-persona').value = JSON.stringify(this.persona, null, 2);
+    document.getElementById('btn-save-persona').addEventListener('click', () => {
+      try { this.persona = JSON.parse(document.getElementById('json-persona').value); localStorage.setItem('vrm_persona', JSON.stringify(this.persona)); window.showToast('人格を適用しました'); } catch(e) { window.showToast('JSONエラー', true); }
+    });
+
+    const dlJson = (data, name) => { const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url); };
+    document.getElementById('btn-export-memory').addEventListener('click', () => dlJson(this.relationMemory, 'vrm_memory.json'));
+    document.getElementById('btn-export-log').addEventListener('click', () => dlJson(this.chatHistory, 'vrm_chatlog.json'));
+    
+    document.getElementById('btn-clear-memory').addEventListener('click', () => { this.chatHistory = []; this.relationMemory = {}; localStorage.removeItem('vrm_chatLog'); localStorage.removeItem('vrm_memory'); this.historyDiv.innerHTML = ''; this.qrDiv.innerHTML = ''; window.showToast('データをリセットしました'); });
+  }
+
+  setStatus(s) { 
+      document.getElementById('statusLed').className = `led ${s}`; 
+      document.getElementById('statusLabel').innerText = { idle: '待機中', listening: 'ヒアリング', thinking: '思考中', speaking: '発話中', live: 'LIVE接続' }[s] || s; 
+      this.bus.dispatchEvent(new CustomEvent('app-status', { detail: s }));
+  }
+
+  renderHistory() {
+    this.historyDiv.innerHTML = '';
+    this.chatHistory.slice(-15).forEach(m => { const div = document.createElement('div'); div.className = `msg-bubble ${m.role}`; div.textContent = m.content; this.historyDiv.appendChild(div); });
+    this.historyDiv.scrollTop = this.historyDiv.scrollHeight;
+  }
+
+  unlockAudio() {
+      if (!this.sharedAudioCtx) { this.sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 }); }
+      if (this.sharedAudioCtx.state === 'suspended') { this.sharedAudioCtx.resume(); }
+      try { const buffer = this.sharedAudioCtx.createBuffer(1, 1, 22050); const source = this.sharedAudioCtx.createBufferSource(); source.buffer = buffer; source.connect(this.sharedAudioCtx.destination); source.start(0); } catch(e){}
+  }
+
+  cancelAllAudio() {
+      this.activeTtsNodes.forEach(node => { try { node.stop(); } catch(e){} }); this.activeTtsNodes = [];
+      try { window.speechSynthesis.cancel(); } catch(e){}
+  }
+
+  handleSend() {
+    if(this.isLiveMode) return;
+    const text = this.chatInput.value.trim(); if (!text) return;
+    this.unlockAudio(); this.cancelAllAudio();
+
+    this.chatInput.value = ''; this.qrDiv.innerHTML = '';
+    this.chatHistory.push({ role: 'user', content: text }); this.renderHistory();
+    this.bus.dispatchEvent(new CustomEvent('vrm-wakeup')); 
+    this.bus.dispatchEvent(new CustomEvent('request-vrma-list', { detail: { callback: (list) => this.bus.dispatchEvent(new CustomEvent('user-message', { detail: { text, vrmaList: list } })) } }));
+  }
+
+  async fetchGeminiTTS(text, apiKey) {
+    const ttsModel = document.getElementById('tts-model-input').value.trim() || 'gemini-2.5-flash-preview-tts';
+    const voiceName = document.getElementById('tts-voice-select').value;
+    try {
+      const payload = { contents: [{ parts: [{ text: text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } } } };
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+      if (!res.ok) return null;
+      const data = await res.json(); const parts = data?.candidates?.[0]?.content?.parts; if (!parts) return null;
+      const audioPart = parts.find(p => p.inlineData && (p.inlineData.mimeType.startsWith('audio/'))); if (!audioPart) return null;
+      
+      const base64 = audioPart.inlineData.data; const bin = atob(base64); const pcmUint8 = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) pcmUint8[i] = bin.charCodeAt(i);
+      const isL16 = audioPart.inlineData.mimeType.includes('L16') || audioPart.inlineData.mimeType.includes('pcm');
+      
+      if (!this.sharedAudioCtx) this.sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      if (this.sharedAudioCtx.state === 'suspended') this.sharedAudioCtx.resume();
+      
+      if (isL16) { 
+        const buf = new ArrayBuffer(44 + pcmUint8.length); const dv = new DataView(buf);
+        const wStr = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+        wStr(0, 'RIFF'); dv.setUint32(4, 36 + pcmUint8.length, true); wStr(8, 'WAVE'); wStr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 24000, true); dv.setUint32(28, 48000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); wStr(36, 'data'); dv.setUint32(40, pcmUint8.length, true); new Uint8Array(buf, 44).set(pcmUint8);
+        return await this.sharedAudioCtx.decodeAudioData(await new Blob([buf], { type: 'audio/wav' }).arrayBuffer()); 
+      } else { return await this.sharedAudioCtx.decodeAudioData(pcmUint8.buffer.slice(0)); }
+    } catch (e) { console.warn(e); return null; }
+  }
+
+  playTtsAudioBuffer(audioBuffer) {
+    if (!this.sharedAudioCtx) return;
+    this.cancelAllAudio(); if (this.sharedAudioCtx.state === 'suspended') this.sharedAudioCtx.resume();
+    const src = this.sharedAudioCtx.createBufferSource(); src.buffer = audioBuffer; src.connect(this.sharedAudioCtx.destination); src.start(0); 
+    this.activeTtsNodes.push(src); this.setStatus('speaking');
+    let isCleaned = false;
+    const cleanup = () => { if (isCleaned) return; isCleaned = true; this.activeTtsNodes = this.activeTtsNodes.filter(n => n !== src); this.setStatus('idle'); this.bus.dispatchEvent(new CustomEvent('speech-ended')); };
+    src.onended = cleanup; setTimeout(() => { if (!isCleaned) cleanup(); }, audioBuffer.duration * 1000 + 1000);
+  }
+
+  fallbackWebSpeech(text) {
+      this.cancelAllAudio();
+      setTimeout(() => {
+          this.setStatus('speaking'); const utter = new SpeechSynthesisUtterance(text); const selVoice = document.getElementById('voice-select').value;
+          if (this.voices && this.voices[selVoice]) utter.voice = this.voices[selVoice];
+          window.__utterances.push(utter); 
+          let isCleaned = false;
+          const cleanup = () => { if (isCleaned) return; isCleaned = true; this.setStatus('idle'); this.bus.dispatchEvent(new CustomEvent('speech-ended')); window.__utterances = window.__utterances.filter(u => u !== utter); };
+          utter.onend = cleanup; utter.onerror = cleanup; window.speechSynthesis.speak(utter);
+          setTimeout(() => { if (!isCleaned) { window.speechSynthesis.cancel(); cleanup(); } }, text.length * 300 + 2000);
+      }, 50);
+  }
+
+  async callAPI(userText, vrmaList) {
+    const apiKey = this.apiKeyInput.value.trim(); if (!apiKey) { window.showToast('APIキーを設定してください', true); return; }
+    
+    this.setStatus('thinking'); this.bus.dispatchEvent(new CustomEvent('llm-thinking')); 
+    const botMsg = document.createElement('div'); botMsg.className = 'msg-bubble ai thinking'; botMsg.textContent = '考え中...'; 
+    this.historyDiv.appendChild(botMsg); this.historyDiv.scrollTop = this.historyDiv.scrollHeight;
+
+    const sysPrompt = `【人格】${JSON.stringify(this.persona)} 【記憶】${JSON.stringify(this.relationMemory)}
+出力は以下のJSONのみ。{"text": "セリフ", "emotion": "neutral, happy, angry, sad, relaxed", "action": "アクション名。[${vrmaList.join(', ')}, jump, think, none]", "quick_replies": ["候補1","候補2"], "memory_update": {}}`;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${document.getElementById('chat-model-input').value}:generateContent?key=${apiKey}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: sysPrompt }] }, contents: this.chatHistory.slice(-5).map(m => ({ role: m.role==='user'?'user':'model', parts: [{text: m.content}] })), generationConfig: { responseMimeType: 'application/json' } })
+      });
+      if (!res.ok) throw new Error('Network response was not ok');
+      const data = await res.json(); if(!data.candidates || data.candidates.length === 0) throw new Error('No candidates');
+      
+      const json = JSON.parse(data.candidates[0].content.parts[0].text);
+      if (json.memory_update) { this.relationMemory = {...this.relationMemory, ...json.memory_update}; localStorage.setItem('vrm_memory', JSON.stringify(this.relationMemory)); }
+      
+      let audioBuffer = null;
+      if (document.getElementById('use-gemini-tts').checked) audioBuffer = await this.fetchGeminiTTS(json.text, apiKey);
+
+      botMsg.className = 'msg-bubble ai'; botMsg.textContent = json.text || '...'; 
+      this.chatHistory.push({ role: 'ai', content: json.text });
+      if(this.chatHistory.length > 50) this.chatHistory = this.chatHistory.slice(-50);
+      localStorage.setItem('vrm_chatLog', JSON.stringify(this.chatHistory));
+      
+      if(json.quick_replies && Array.isArray(json.quick_replies)) {
+          json.quick_replies.forEach(t => { const btn = document.createElement('button'); btn.className = 'qr-btn'; btn.textContent = t; btn.onclick = () => { this.chatInput.value = t; this.handleSend(); }; this.qrDiv.appendChild(btn); });
+      }
+      
+      if (audioBuffer) { this.playTtsAudioBuffer(audioBuffer); } else { this.fallbackWebSpeech(json.text); }
+      
+      let targetAction = json.action || 'none'; let targetEmotion = json.emotion || 'neutral';
+      const lowerText = (json.text || '').toLowerCase();
+      if (targetAction === 'none' || targetAction === '') {
+          if (lowerText.includes('ジャンプ') || lowerText.includes('jump') || lowerText.includes('跳んで')) targetAction = 'jump';
+          else if (lowerText.includes('考えて') || lowerText.includes('think') || lowerText.includes('うーん')) targetAction = 'think';
+          else { const matched = vrmaList.find(name => lowerText.includes(name.toLowerCase())); if (matched) targetAction = matched; }
+      }
+      if (targetEmotion === 'neutral' || targetEmotion === '') {
+          if (lowerText.includes('笑') || lowerText.includes('うれし') || lowerText.includes('喜') || lowerText.includes('happy')) targetEmotion = 'happy';
+          else if (lowerText.includes('怒') || lowerText.includes('ぷんぷん') || lowerText.includes('angry')) targetEmotion = 'angry';
+          else if (lowerText.includes('悲') || lowerText.includes('泣') || lowerText.includes('sad')) targetEmotion = 'sad';
+          else if (lowerText.includes('リラックス') || lowerText.includes('落ち着') || lowerText.includes('relaxed')) targetEmotion = 'relaxed';
+      }
+
+      this.bus.dispatchEvent(new CustomEvent('llm-response', { detail: { action: targetAction, emotion: targetEmotion, playSource: 'single' } }));
+    } catch (e) { 
+        botMsg.className = 'msg-bubble ai'; botMsg.textContent = 'APIエラーが発生しました。モデル名や設定を確認してください。'; 
+        this.setStatus('idle'); this.bus.dispatchEvent(new CustomEvent('llm-response', { detail: { action: 'none', playSource: 'single' } }));
+    }
+  }
+
+  async toggleLiveMode() {
+    if (this.isConnectingLive) return; 
+    if (this.isLiveMode) { this.stopLiveMode(); return; }
+    
+    this.isConnectingLive = true;
+    const btn = document.getElementById('live-toggle-btn');
+    btn.style.opacity = '0.5';
+
+    const apiKey = this.apiKeyInput.value.trim(); 
+    if (!apiKey) { window.showToast('APIキーが未設定', true); this.isConnectingLive = false; btn.style.opacity = '1'; return; }
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { 
+        window.showToast('マイクが使用できない環境です', true); this.isConnectingLive = false; btn.style.opacity = '1'; return; 
+    }
+
+    this.unlockAudio(); 
+
+    try {
+      this.micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      this.micCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = this.micCtx.createMediaStreamSource(this.micStream);
+      
+      const workletCode = `class PCMProcessor extends AudioWorkletProcessor { 
+        process(inputs) { 
+          const input = inputs[0]; 
+          if (input && input.length > 0) { 
+            const channelData = input[0]; 
+            const pcm16 = new Int16Array(channelData.length); 
+            let sum = 0;
+            for (let i = 0; i < channelData.length; i++) { 
+                const val = channelData[i];
+                sum += val * val;
+                pcm16[i] = Math.max(-1, Math.min(1, val)) * 32767; 
+            } 
+            const rms = Math.sqrt(sum / channelData.length);
+            this.port.postMessage({ buffer: pcm16.buffer, rms: rms }, [pcm16.buffer]); 
+          } return true; 
+        } 
+      } registerProcessor('pcm-processor', PCMProcessor);`;
+      const workletUrl = URL.createObjectURL(new Blob([workletCode], { type: 'application/javascript' }));
+      await this.micCtx.audioWorklet.addModule(workletUrl); URL.revokeObjectURL(workletUrl);
+      
+      this.liveWorklet = new AudioWorkletNode(this.micCtx, 'pcm-processor'); 
+      source.connect(this.liveWorklet); this.liveWorklet.connect(this.micCtx.destination);
+      
+      this.ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`);
+      
+      this.ws.onopen = () => {
+        this.isLiveMode = true; document.body.classList.add('is-live');
+        btn.classList.add('on'); btn.innerHTML = '<span>■ LIVE終了</span>';
+        this.setStatus('listening'); window.showToast('🔴 LIVE接続完了'); 
+        document.getElementById('live-captions').innerHTML = '';
+        this.currentLiveUserCaption = null; this.currentLiveAiCaption = null; this.nextAudioTime = 0;
+        this.currentAiResponseBuffer = ''; 
+        
+        if (this.recognition) { try { this.recognition.start(); } catch(e){} }
+
+        const sysInst = `人格: ${JSON.stringify(this.persona)}。記憶: ${JSON.stringify(this.relationMemory)}。短くテンポよく返答し、自然に会話を続けてください。`;
+        
+        const selectedModel = document.getElementById('live-model-input').value.trim();
+        const setupConfig = {
+            model: `models/${selectedModel}`, 
+            systemInstruction: { parts: [{ text: sysInst }] }, 
+            generationConfig: { 
+                responseModalities: ['AUDIO'], 
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: document.getElementById('live-voice-select').value } } } 
+            },
+            inputAudioTranscription: {}, 
+            outputAudioTranscription: {}
+        };
+
+        this.ws.send(JSON.stringify({ setup: setupConfig }));
+      };
+      
+      this.ws.onerror = (e) => { 
+          console.error('WebSocket Error:', e); 
+          window.showToast('通信エラー。モデル名が正しいか確認してください', true); 
+          this.stopLiveMode(); 
+      };
+      this.ws.onclose = (e) => { 
+          console.log('WebSocket closed:', e.code, e.reason); 
+          if (this.isLiveMode) { 
+              window.showToast(`サーバー切断 (Code: ${e.code}) モデル名や権限を確認してください`, true); 
+              this.stopLiveMode(); 
+          } 
+      };
+      
+      this.liveWorklet.port.onmessage = (e) => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        const { buffer, rms } = e.data;
+        const currentLed = document.getElementById('statusLed').className;
+        
+        if (!currentLed.includes('speaking')) {
+            if (rms > 0.02) {
+                if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
+                if (!currentLed.includes('listening')) { this.setStatus('listening'); }
+            } else if (rms <= 0.01) {
+                if (!this.silenceTimer && currentLed.includes('listening')) {
+                    this.silenceTimer = setTimeout(() => { this.setStatus('thinking'); this.bus.dispatchEvent(new CustomEvent('llm-thinking')); }, 1500); 
+                }
+            }
+        }
+
+        const uint8 = new Uint8Array(buffer); 
+        let binary = ''; 
+        for(let i=0; i<uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        
+        this.ws.send(JSON.stringify({ 
+            realtimeInput: { audio: { data: btoa(binary), mimeType: 'audio/pcm;rate=16000' } } 
+        }));
+      };
+      
+      this.ws.onmessage = async (e) => {
+        let data; try { data = JSON.parse(e.data instanceof Blob ? await e.data.text() : e.data); } catch(err) { return; }
+        const sc = data.serverContent; if(!sc) return;
+        
+        if (sc.interrupted) {
+            this.nextAudioTime = this.sharedAudioCtx.currentTime;
+            this.activeTtsNodes.forEach(n => { try { n.stop(); } catch(err){} }); this.activeTtsNodes = [];
+            this.bus.dispatchEvent(new CustomEvent('speech-ended'));
+        }
+        
+        if (sc.modelTurn?.parts) {
+          this.setStatus('speaking');
+          this.currentLiveUserCaption = null;
+
+          if (this.sharedAudioCtx.state === 'suspended') this.sharedAudioCtx.resume();
+          
+          sc.modelTurn.parts.forEach(p => { 
+            if (p.inlineData?.data) {
+              const base64 = p.inlineData.data;
+              const binaryString = atob(base64); const bytes = new Uint8Array(binaryString.length); for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+              const int16Array = new Int16Array(bytes.buffer); const float32Array = new Float32Array(int16Array.length); for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32768.0;
+              const audioBuffer = this.sharedAudioCtx.createBuffer(1, float32Array.length, 24000); audioBuffer.getChannelData(0).set(float32Array);
+              const src = this.sharedAudioCtx.createBufferSource(); src.buffer = audioBuffer; src.connect(this.sharedAudioCtx.destination);
+              
+              if (this.nextAudioTime < this.sharedAudioCtx.currentTime + 0.05) this.nextAudioTime = this.sharedAudioCtx.currentTime + 0.05;
+              src.start(this.nextAudioTime); this.nextAudioTime += audioBuffer.duration; this.activeTtsNodes.push(src);
+              
+              src.onended = () => { 
+                  const idx = this.activeTtsNodes.indexOf(src); 
+                  if(idx > -1) this.activeTtsNodes.splice(idx, 1); 
+                  if(this.activeTtsNodes.length === 0) { this.setStatus('listening'); this.bus.dispatchEvent(new CustomEvent('speech-ended')); }
+              };
+            }
+          });
+        }
+        
+        if (sc.outputTranscription?.text) {
+            if (document.getElementById('show-live-captions').checked) {
+                this.updateLiveCaptionStreaming('ai', sc.outputTranscription.text, false);
+            }
+            this.currentAiResponseBuffer += sc.outputTranscription.text;
+        }
+
+        if (sc.turnComplete) { 
+            this.setStatus('listening'); 
+            
+            if (this.currentAiResponseBuffer.trim() !== '') {
+                this.chatHistory.push({ role: 'ai', content: this.currentAiResponseBuffer.trim() });
+                if(this.chatHistory.length > 50) this.chatHistory = this.chatHistory.slice(-50);
+                localStorage.setItem('vrm_chatLog', JSON.stringify(this.chatHistory));
+                this.renderHistory();
+                this.currentAiResponseBuffer = ''; 
+            }
+        }
+      };
+    } catch(err) { 
+        console.error(err); window.showToast('初期化エラー: ' + (err.message || '通信失敗'), true); 
+        this.stopLiveMode(); 
+    } finally {
+        this.isConnectingLive = false; btn.style.opacity = '1';
+    }
+  }
+
+  stopLiveMode() {
+    if (this.ws) { this.ws.close(); this.ws = null; } if (this.liveWorklet) { this.liveWorklet.disconnect(); this.liveWorklet = null; }
+    if (this.micCtx) { if(this.micCtx.state !== 'closed') this.micCtx.close().catch(console.error); this.micCtx = null; } 
+    if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
+    if (this.recognition) { try { this.recognition.stop(); } catch(e){} }
+    this.activeTtsNodes.forEach(n => { try { n.stop(); } catch(e){} }); this.activeTtsNodes = [];
+    this.nextAudioTime = 0; this.isConnectingLive = false;
+    this.isLiveMode = false; document.body.classList.remove('is-live');
+    const btn = document.getElementById('live-toggle-btn'); btn.classList.remove('on'); btn.innerHTML = '<span>● LIVE API</span>'; btn.style.opacity = '1';
+    this.setStatus('idle'); this.bus.dispatchEvent(new CustomEvent('speech-ended')); 
+  }
+}
+
+// --------------------------------------------------------
+// [VRMModule] Three.js, VRM描画, 首振りのローカル空間・滑らか追従
+// --------------------------------------------------------
+class VRMModule {
+  constructor(bus) {
+    this.bus = bus;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.01, 100);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.clock = new THREE.Clock();
+    
+    this.vrm = null; this.mixer = null;
+    this.currentAction = null; this.idleAction = null; 
+    
+    this.state = 'IDLE_STAND'; 
+    this.lastActivityTime = Date.now();
+    this.sittingStartTime = 0; 
+    this.benchPosition = new THREE.Vector3(0, 0, -2.5);
+    this.standUpProgress = 0.0;
+    this.needsPhysicsReset = false; 
+    
+    this.isThinking = false;
+    this.isSpeaking = false;
+    this.isListening = false;
+    this.thinkPattern = 0; 
+    
+    this.continuousMoveDir = null; 
+    this.proceduralJump = 0;
+
+    this.lookAtTarget = new THREE.Object3D(); 
+    this.dampedLookAtTarget = new THREE.Vector3(); 
+    this.noiseTime = Math.random() * 100;
+    this.scene.add(this.lookAtTarget);
+
+    this.initThree(); this.initLoaders(); this.createEnvironment();
+    this.animate = this.animate.bind(this); requestAnimationFrame(this.animate);
+
+    this.bus.addEventListener('vrm-load', (e) => this.loadVRM(e.detail.buffer));
+    this.bus.addEventListener('vrm-action', (e) => this.handleAction(e.detail));
+    this.bus.addEventListener('vrm-wakeup', () => { this.resetActivity(); }); 
+    
+    this.bus.addEventListener('app-status', (e) => {
+        const s = e.detail;
+        this.isListening = (s === 'listening');
+        this.isThinking = (s === 'thinking');
+        this.isSpeaking = (s === 'speaking');
+        if (s !== 'idle') this.resetActivity();
+        if (this.isThinking) this.thinkPattern = Math.floor(Math.random() * 3);
+    });
+
+    // ★ 強制キャンセルの誤爆を修正
+    this.bus.addEventListener('speech-ended', () => {
+        this.isSpeaking = false;
+        if (this.vrm && this.vrm.expressionManager && this.state !== 'SITTING' && this.state !== 'DOZING' && this.state !== 'DEEP_SLEEP') {
+            ['happy','angry','sad','relaxed','blink','sleep', 'aa', 'ih', 'ou', 'ee', 'oh'].forEach(e => this.vrm.expressionManager.setValue(e, 0));
+        }
+        // プレイリスト再生中でない場合のみ、モーションを終了させて基本姿勢に戻す
+        if (this.currentAction && this.currentAction !== this.idleAction && this.currentPlaySource !== 'playlist') {
+            this.isPlayingVRMA = false;
+            this.idleAction.reset().play();
+            this.idleAction.crossFadeFrom(this.currentAction, 0.4, true);
+            this.currentAction = this.idleAction;
+            this.currentPlaySource = null;
+            this.changeState('IDLE_STAND');
+        }
+    });
+
+    this.bus.addEventListener('vrm-move-start', (e) => {
+      if (this.state === 'SITTING' || this.state === 'DOZING' || this.state === 'DEEP_SLEEP') {
+        this.changeState('STANDING_UP'); this.standUpProgress = 0.0; this.resetExpression(); this.needsPhysicsReset = true; return; 
+      }
+      if (this.state === 'STANDING_UP') return; 
+      this.continuousMoveDir = e.detail.dir; this.lastActivityTime = Date.now();
+    });
+    this.bus.addEventListener('vrm-move-stop', () => { this.continuousMoveDir = null; });
+  }
+
+  changeState(newState) { this.state = newState; }
+
+  initThree() {
+    this.camera.position.set(0, 1.45, 1.5); 
+    this.dampedLookAtTarget.copy(this.camera.position); 
+    this.renderer.setClearColor(0xeef2f5, 1); this.renderer.setSize(window.innerWidth, window.innerHeight); this.renderer.setPixelRatio(window.devicePixelRatio); document.body.appendChild(this.renderer.domElement);
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window.showToast('メモリ節約のため非表示。呼び出しボタンを押してください。', true); });
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement); 
+    this.controls.target.set(0, 1.35, 0); 
+    this.controls.enableDamping = true; this.controls.enablePan = true; this.controls.enableZoom = true;
+    
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.5); keyLight.position.set(2, 3, 3).normalize(); this.scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xddeeff, 1.2); fillLight.position.set(-2, 2, 1).normalize(); this.scene.add(fillLight);
+    window.addEventListener('resize', () => { this.camera.aspect = window.innerWidth/window.innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); });
+  }
+
+  createEnvironment() {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, roughness: 0.1 })); 
+    floor.rotation.x = -Math.PI / 2; this.scene.add(floor);
+    const grid = new THREE.GridHelper(20, 20, 0xaaaaaa, 0xdddddd); grid.position.y = 0.01; this.scene.add(grid);
+
+    const benchGroup = new THREE.Group(); const woodMat = new THREE.MeshLambertMaterial({ color: 0x6b4226 }); 
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.5), woodMat); seat.position.y = 0.45;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.3, 0.05), woodMat); back.position.set(0, 0.65, -0.22);
+    const legGeo = new THREE.BoxGeometry(0.05, 0.45, 0.05);
+    const legLF = new THREE.Mesh(legGeo, woodMat); legLF.position.set(-0.7, 0.225, 0.2); const legLB = new THREE.Mesh(legGeo, woodMat); legLB.position.set(-0.7, 0.225, -0.2);
+    const legRF = new THREE.Mesh(legGeo, woodMat); legRF.position.set(0.7, 0.225, 0.2); const legRB = new THREE.Mesh(legGeo, woodMat); legRB.position.set(0.7, 0.225, -0.2);
+    const supportL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.05), woodMat); supportL.position.set(-0.7, 0.5, -0.22); const supportR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.05), woodMat); supportR.position.set(0.7, 0.5, -0.22);
+    benchGroup.add(seat, back, legLF, legLB, legRF, legRB, supportL, supportR); benchGroup.position.copy(this.benchPosition); this.scene.add(benchGroup);
+  }
+
+  initLoaders() {
+    this.gltfLoader = new GLTFLoader(); this.gltfLoader.register((parser) => new VRMLoaderPlugin(parser)); this.gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+  }
+
+  createSafeIdleClip() {
+    const tracks = []; const qZero = new THREE.Quaternion(0, 0, 0, 1);
+    const bonesToReset = ['spine', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg'];
+    bonesToReset.forEach(b => { const node = this.vrm?.humanoid?.getNormalizedBoneNode(b); if (node) tracks.push(new THREE.QuaternionKeyframeTrack(node.name + '.quaternion', [0], [qZero.x, qZero.y, qZero.z, qZero.w])); });
+    return new THREE.AnimationClip('SafeIdle', 1, tracks);
+  }
+
+  loadVRM(buffer) {
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    this.gltfLoader.load(URL.createObjectURL(blob), (gltf) => {
+      if (this.vrm) this.scene.remove(this.vrm.scene);
+      this.vrm = gltf.userData.vrm; this.vrm.scene.rotation.y = Math.PI; this.scene.add(this.vrm.scene);
+      this.vrm.scene.traverse((obj) => { if (obj.isMesh || obj.isSkinnedMesh) obj.frustumCulled = false; });
+      
+      if (this.vrm.lookAt) {
+          this.vrm.lookAt.target = this.lookAtTarget;
+          this.vrm.lookAt.autoUpdate = true;
+      }
+
+      const hips = this.vrm.humanoid.getNormalizedBoneNode('hips'); this.initialHipY = hips ? hips.position.y : 0.8;
+
+      this.mixer = new THREE.AnimationMixer(this.vrm.scene); this.mixer.addEventListener('finished', (e) => this.onActionFinished(e));
+      this.idleAction = this.mixer.clipAction(this.createSafeIdleClip()); this.idleAction.play(); this.currentAction = this.idleAction;
+      this.isPlayingVRMA = false; document.getElementById('vrm-status').innerText = '読込完了'; this.changeState('IDLE_STAND');
+    });
+  }
+
+  resetExpression() {
+      if (this.vrm && this.vrm.expressionManager) { this.vrm.expressionManager.setValue('blink', 0); this.vrm.expressionManager.setValue('relaxed', 0); this.vrm.expressionManager.setValue('sleep', 0); }
+  }
+
+  resetActivity() {
+      this.lastActivityTime = Date.now();
+      if (this.state === 'SITTING' || this.state === 'DOZING' || this.state === 'DEEP_SLEEP') {
+          this.standUpInstant();
+      } else if (this.state === 'WALKING_TO_BENCH') {
+          this.changeState('IDLE_STAND');
+      }
+  }
+
+  standUpInstant() {
+    this.vrm.scene.position.set(this.benchPosition.x, 0, this.benchPosition.z + 1.0);
+    const hips = this.vrm.humanoid.getNormalizedBoneNode('hips'); if (hips) hips.position.y = this.initialHipY;
+    const lLeg = this.vrm.humanoid.getNormalizedBoneNode('leftUpperLeg'); const rLeg = this.vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+    const lKnee = this.vrm.humanoid.getNormalizedBoneNode('leftLowerLeg'); const rKnee = this.vrm.humanoid.getNormalizedBoneNode('rightLowerLeg');
+    if(lLeg) lLeg.rotation.set(0,0,0); if(rLeg) rLeg.rotation.set(0,0,0); if(lKnee) lKnee.rotation.set(0,0,0); if(rKnee) rKnee.rotation.set(0,0,0);
+
+    const head = this.vrm.humanoid.getNormalizedBoneNode('head'); const neck = this.vrm.humanoid.getNormalizedBoneNode('neck');
+    if (head) head.quaternion.identity(); if (neck) neck.quaternion.identity();
+
+    this.resetExpression(); this.needsPhysicsReset = true; this.lastActivityTime = Date.now(); this.changeState('IDLE_STAND');
+  }
+
+  handleAction(detail) {
+    if (!this.vrm) return; 
+    if (this.state === 'SITTING' || this.state === 'DOZING' || this.state === 'DEEP_SLEEP' || this.state === 'STANDING_UP') { this.standUpInstant(); }
+    
+    if (detail.emotion && this.vrm.expressionManager) {
+      ['neutral','happy','angry','sad','relaxed','blink','sleep'].forEach(e => this.vrm.expressionManager.setValue(e, 0));
+      if(this.vrm.expressionManager.getExpressionTrackName(detail.emotion)) this.vrm.expressionManager.setValue(detail.emotion, 1.0);
+    }
+
+    if (detail.actionName === 'none') {
+        this.changeState('IDLE_STAND'); return;
+    }
+    
+    this.changeState('ACTION');
+    
+    if (detail.animClip) {
+      this.isPlayingVRMA = true; 
+      const clip = createVRMAnimationClip(detail.animClip, this.vrm); 
+      const action = this.mixer.clipAction(clip);
+      action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.reset().play(); 
+      if (this.currentAction && this.currentAction !== action) action.crossFadeFrom(this.currentAction, 0.4, true);
+      this.currentAction = action; this.currentPlaySource = detail.playSource || 'single'; 
+    } else {
+      if (detail.actionName === 'jump') this.proceduralJump = 1.0; 
+      else this.changeState('IDLE_STAND');
+    }
+  }
+
+  // ★ フラグリセット順序バグを修正
+  onActionFinished(e) {
+    if (e.action === this.currentAction && e.action !== this.idleAction) {
+        this.isPlayingVRMA = false; 
+        const wasPlaylist = (this.currentPlaySource === 'playlist');
+        this.currentPlaySource = null;
+        if (wasPlaylist) { this.bus.dispatchEvent(new CustomEvent('vrma-finished')); }
+    }
+  }
+
+  applyProceduralAnimation(time, delta) {
+    if (!this.vrm) return;
+    
+    if (this.isThinking || this.isSpeaking || this.isListening) { this.lastActivityTime = Date.now(); }
+    const elapsedSinceActivity = (Date.now() - this.lastActivityTime);
+    const isLive = document.body.classList.contains('is-live');
+
+    if (this.isSpeaking && this.vrm.expressionManager) {
+        const lipSyncVal = Math.max(0, (Math.sin(time * 20) * 0.6 + 0.4) * (Math.random() > 0.2 ? 1.0 : 0.2));
+        this.vrm.expressionManager.setValue('aa', lipSyncVal);
+    }
+
+    if (this.state === 'STANDING_UP') {
+        this.standUpProgress += delta * 2.0; 
+        const hips = this.vrm.humanoid.getNormalizedBoneNode('hips');
+        const lLeg = this.vrm.humanoid.getNormalizedBoneNode('leftUpperLeg'); const rLeg = this.vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+        const lKnee = this.vrm.humanoid.getNormalizedBoneNode('leftLowerLeg'); const rKnee = this.vrm.humanoid.getNormalizedBoneNode('rightLowerLeg');
+
+        const currentHipY = THREE.MathUtils.lerp(this.initialHipY - 0.45, this.initialHipY, this.standUpProgress);
+        if(hips) hips.position.set(0, currentHipY, 0.1 * (1 - this.standUpProgress));
+        
+        const currentRot = THREE.MathUtils.lerp(1.3, 0, this.standUpProgress); const currentKneeRot = THREE.MathUtils.lerp(-1.3, 0, this.standUpProgress);
+        if(lLeg) lLeg.rotation.x = currentRot; if(rLeg) rLeg.rotation.x = currentRot; if(lKnee) lKnee.rotation.x = currentKneeRot; if(rKnee) rKnee.rotation.x = currentKneeRot;
+
+        this.vrm.scene.position.z = THREE.MathUtils.lerp(this.benchPosition.z, this.benchPosition.z + 1.0, this.standUpProgress);
+        if (this.standUpProgress >= 1.0) {
+            if (hips) hips.position.y = this.initialHipY;
+            this.vrm.scene.position.set(this.benchPosition.x, 0, this.benchPosition.z + 1.0); this.changeState('IDLE_STAND');
+        }
+        return; 
+    }
+
+    if (this.continuousMoveDir && this.state === 'IDLE_STAND') {
+        const moveSpeed = 2.0 * delta; let targetRot = 0;
+        if (this.continuousMoveDir === 'up') { this.vrm.scene.position.z -= moveSpeed; targetRot = 0; }
+        if (this.continuousMoveDir === 'down') { this.vrm.scene.position.z += moveSpeed; targetRot = Math.PI; }
+        if (this.continuousMoveDir === 'left') { this.vrm.scene.position.x -= moveSpeed; targetRot = Math.PI / 2; }
+        if (this.continuousMoveDir === 'right') { this.vrm.scene.position.x += moveSpeed; targetRot = -Math.PI / 2; }
+        
+        const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, targetRot, 0));
+        this.vrm.scene.quaternion.slerp(targetQuat, delta * 15);
+
+        const lLeg = this.vrm.humanoid.getNormalizedBoneNode('leftUpperLeg'); const rLeg = this.vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+        const lArm = this.vrm.humanoid.getNormalizedBoneNode('leftUpperArm'); const rArm = this.vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+        if(lLeg) lLeg.rotation.x = Math.sin(time * 10) * 0.4; if(rLeg) rLeg.rotation.x = Math.sin(time * 10 + Math.PI) * 0.4;
+        if(lArm) lArm.rotation.x = Math.sin(time * 10 + Math.PI) * 0.2; if(rArm) rArm.rotation.x = Math.sin(time * 10) * 0.2;
+        
+        this.lastActivityTime = Date.now(); return;
+    }
+
+    if (!this.continuousMoveDir && this.state === 'IDLE_STAND' && !this.isPlayingVRMA && !this.isThinking && !this.isSpeaking) {
+        const resetBonesQuats = {
+            'leftUpperLeg': new THREE.Quaternion(), 'rightUpperLeg': new THREE.Quaternion(),
+            'leftUpperArm': new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.05, 0, 1.25)),
+            'rightUpperArm': new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.05, 0, -1.25)),
+            'leftLowerArm': new THREE.Quaternion(), 'rightLowerArm': new THREE.Quaternion()
+        };
+        for (const [bName, targetQuat] of Object.entries(resetBonesQuats)) {
+            const bone = this.vrm.humanoid.getNormalizedBoneNode(bName);
+            if (bone) bone.quaternion.slerp(targetQuat, delta * 5);
+        }
+    }
+
+    const breathScale = isLive ? 2.0 : 1.0;
+    const chest = this.vrm.humanoid.getNormalizedBoneNode('chest');
+    if (chest && this.state === 'IDLE_STAND' && !this.continuousMoveDir) {
+        chest.rotation.x = Math.sin(time * 1.5) * 0.03 * breathScale; 
+    }
+
+    if (isLive && this.state === 'IDLE_STAND' && !this.continuousMoveDir && !this.isPlayingVRMA && !this.isThinking && !this.isSpeaking) {
+        const lArm = this.vrm.humanoid.getNormalizedBoneNode('leftUpperArm'); 
+        const rArm = this.vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+        if (lArm) lArm.rotation.z = THREE.MathUtils.lerp(lArm.rotation.z, 1.25 + Math.sin(time * 1.2) * 0.05, delta * 5);
+        if (rArm) rArm.rotation.z = THREE.MathUtils.lerp(rArm.rotation.z, -1.25 - Math.sin(time * 1.2) * 0.05, delta * 5);
+        if (lArm) lArm.rotation.x = THREE.MathUtils.lerp(lArm.rotation.x, -0.05 + Math.cos(time * 0.8) * 0.05, delta * 5);
+        if (rArm) rArm.rotation.x = THREE.MathUtils.lerp(rArm.rotation.x, -0.05 + Math.cos(time * 0.8) * 0.05, delta * 5);
+    }
+
+    if (this.isThinking && !this.isPlayingVRMA) {
+        const rArm = this.vrm.humanoid.getNormalizedBoneNode('rightUpperArm'); const rElbow = this.vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
+        const wave = Math.sin(time * 1.5) * 0.05;
+        if(rArm) { rArm.rotation.z = THREE.MathUtils.lerp(rArm.rotation.z, 0.1, delta * 4); rArm.rotation.x = THREE.MathUtils.lerp(rArm.rotation.x, -0.6 + wave, delta * 4); }
+        if(rElbow) { rElbow.rotation.z = THREE.MathUtils.lerp(rElbow.rotation.z, 2.2 + wave * 2, delta * 4); rElbow.rotation.x = THREE.MathUtils.lerp(rElbow.rotation.x, 0.5, delta * 4); }
+    }
+
+    if (this.isSpeaking && !this.isPlayingVRMA && (this.state === 'IDLE_STAND' || this.state === 'ACTION')) {
+        const rArm = this.vrm.humanoid.getNormalizedBoneNode('rightUpperArm'); const rElbow = this.vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
+        const wave = Math.sin(time * 2.0) * 0.05; 
+        if (rArm) { rArm.rotation.z = THREE.MathUtils.lerp(rArm.rotation.z, -0.4, delta * 4); rArm.rotation.x = THREE.MathUtils.lerp(rArm.rotation.x, -0.1 + wave, delta * 4); }
+        if (rElbow) { rElbow.rotation.z = THREE.MathUtils.lerp(rElbow.rotation.z, 0.4 + wave, delta * 4); }
+    }
+
+    if (this.state === 'IDLE_STAND' && elapsedSinceActivity > 15000 && !this.isThinking && !this.isSpeaking && !this.isListening) {
+        this.changeState('WALKING_TO_BENCH');
+    }
+    
+    if (this.state === 'WALKING_TO_BENCH') {
+      const pos = this.vrm.scene.position; const dir = new THREE.Vector3().subVectors(this.benchPosition, pos); dir.y = 0;
+      if (dir.length() > 0.1) {
+        dir.normalize(); pos.add(dir.multiplyScalar(delta * 1.5));
+        const lLeg = this.vrm.humanoid.getNormalizedBoneNode('leftUpperLeg'); const rLeg = this.vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+        if(lLeg) lLeg.rotation.x = Math.sin(time * 10) * 0.3; if(rLeg) rLeg.rotation.x = Math.sin(time * 10 + Math.PI) * 0.3;
+        const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(-dir.x, -dir.z), 0));
+        this.vrm.scene.quaternion.slerp(targetQuat, delta * 10);
+      } else { this.vrm.scene.rotation.y = Math.PI; this.lastActivityTime = Date.now(); this.changeState('SITTING'); this.sittingStartTime = Date.now(); }
+    }
+
+    if (this.state === 'SITTING' || this.state === 'DOZING' || this.state === 'DEEP_SLEEP') {
+      const sitElapsed = Date.now() - this.sittingStartTime;
+      if (this.state === 'SITTING' && sitElapsed > 10000) this.changeState('DOZING');
+      if (this.state === 'DOZING' && sitElapsed > 20000) this.changeState('DEEP_SLEEP');
+      
+      const hips = this.vrm.humanoid.getNormalizedBoneNode('hips');
+      const lLeg = this.vrm.humanoid.getNormalizedBoneNode('leftUpperLeg'); const rLeg = this.vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+      const lKnee = this.vrm.humanoid.getNormalizedBoneNode('leftLowerLeg'); const rKnee = this.vrm.humanoid.getNormalizedBoneNode('rightLowerLeg');
+      
+      if(hips) hips.position.set(0, this.initialHipY - 0.45, 0.1); 
+      if(lLeg) lLeg.rotation.x = 1.3; if(rLeg) rLeg.rotation.x = 1.3; if(lKnee) lKnee.rotation.x = -1.3; if(rKnee) rKnee.rotation.x = -1.3;
+
+      if (this.state === 'DOZING') {
+          if (chest) chest.rotation.x = Math.sin(time * 1.5) * 0.03;
+          if (this.vrm.expressionManager) {
+              const blinkVal = Math.sin(time * 2.5) > 0.8 ? 1.0 : 0.6 + Math.sin(time * 1.2) * 0.3;
+              this.vrm.expressionManager.setValue('blink', blinkVal); this.vrm.expressionManager.setValue('relaxed', 0.5);
+          }
+      } else if (this.state === 'DEEP_SLEEP') {
+          if (chest) chest.rotation.x = Math.sin(time * 1.0) * 0.04;
+          if (this.vrm.expressionManager) { this.vrm.expressionManager.setValue('blink', 1.0); this.vrm.expressionManager.setValue('relaxed', 0.8); }
+      }
+    }
+
+    if (this.proceduralJump > 0) {
+      const hips = this.vrm.humanoid.getNormalizedBoneNode('hips');
+      if(hips) hips.position.y = this.initialHipY + Math.sin(this.proceduralJump * Math.PI) * 0.5;
+      this.proceduralJump -= delta * 2;
+      if(this.proceduralJump <= 0) { this.proceduralJump = 0; if(hips) hips.position.y = this.initialHipY; this.changeState('IDLE_STAND'); }
+    }
+  }
+
+  animate() {
+    requestAnimationFrame(this.animate);
+    let delta = this.clock.getDelta(); 
+    if (delta > 0.1) delta = 0.1; 
+    const time = this.clock.elapsedTime;
+    
+    this.noiseTime += delta;
+    let targetPos = new THREE.Vector3();
+    
+    if (this.state === 'DOZING' || this.state === 'DEEP_SLEEP') {
+        targetPos.set(0, -2, 2);
+    } else if (this.isThinking) {
+        const awayX = this.camera.position.x + Math.sin(time) * 1.5;
+        const awayY = this.camera.position.y + 0.5 + Math.cos(time * 0.5) * 0.5;
+        targetPos.set(awayX, awayY, this.camera.position.z);
+    } else {
+        targetPos.copy(this.camera.position);
+    }
+
+    targetPos.x += Math.sin(this.noiseTime * 2.1) * 0.05;
+    targetPos.y += Math.cos(this.noiseTime * 1.7) * 0.05;
+
+    this.dampedLookAtTarget.lerp(targetPos, delta * 2.5);
+    
+    if (this.lookAtTarget) {
+        this.lookAtTarget.position.copy(this.dampedLookAtTarget);
+    }
+
+    if (this.mixer) this.mixer.update(delta);
+    
+    if (this.vrm) { 
+        this.applyProceduralAnimation(time, delta); 
+        
+        const headNode = this.vrm.humanoid.getNormalizedBoneNode('head');
+        const neckNode = this.vrm.humanoid.getNormalizedBoneNode('neck');
+        
+        if (headNode && !this.isPlayingVRMA && this.state !== 'DOZING' && this.state !== 'DEEP_SLEEP') {
+            const targetWorldPos = this.dampedLookAtTarget.clone();
+            
+            const parentNode = headNode.parent;
+            if (parentNode) {
+                const parentInvMat = new THREE.Matrix4().copy(parentNode.matrixWorld).invert();
+                const targetLocalPos = targetWorldPos.applyMatrix4(parentInvMat);
+                const headLocalPos = headNode.position.clone();
+                
+                const localDir = new THREE.Vector3().subVectors(targetLocalPos, headLocalPos).normalize();
+                
+                const yaw = Math.atan2(-localDir.x, -localDir.z); 
+                const pitch = Math.asin(localDir.y);
+                
+                const clampYaw = Math.max(-0.6, Math.min(0.6, yaw)); 
+                const clampPitch = Math.max(-0.4, Math.min(0.4, pitch)); 
+                
+                const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(clampPitch, clampYaw, 0, 'YXZ'));
+                headNode.quaternion.slerp(targetQuat, delta * 6);
+                
+                if (neckNode) {
+                    const neckQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(clampPitch * 0.5, clampYaw * 0.5, 0, 'YXZ'));
+                    neckNode.quaternion.slerp(neckQuat, delta * 4);
+                }
+            }
+        } else if (headNode && (this.state === 'DOZING' || this.state === 'DEEP_SLEEP')) {
+            headNode.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.4, 0, 0, 'YXZ')), delta * 2);
+            if (neckNode) neckNode.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 0, 0, 'YXZ')), delta * 2);
+        }
+
+        this.vrm.update(delta); 
+
+        if (this.needsPhysicsReset && this.vrm.springBoneManager) { 
+            this.vrm.springBoneManager.reset(); this.needsPhysicsReset = false; 
+        }
+    }
+    
+    if (this.controls) this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+// --------------------------------------------------------
+// [ExtensionModule] IndexedDB, VRMA管理, プレイリスト独立
+// --------------------------------------------------------
+class ExtensionModule {
+  constructor(bus) {
+    this.bus = bus; this.vrmaLibrary = []; this.playlist = []; this.currentPlayIndex = -1; 
+    this.uiToggle = document.getElementById('vrm-ui-toggle'); this.uiContainer = document.getElementById('vrm-ui-container');
+    this.libraryContainer = document.getElementById('library-container'); this.playlistContainer = document.getElementById('playlist-container');
+    
+    this.initUI(); this.initControllers(); this.initDB();
+    
+    this.bus.addEventListener('llm-response', (e) => {
+      if (!e.detail.action || e.detail.action === 'none') return;
+      const targetVrma = this.vrmaLibrary.find(v => v.name.toLowerCase() === e.detail.action.toLowerCase());
+      this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: targetVrma ? targetVrma.name : e.detail.action, animClip: targetVrma ? targetVrma.animClip : null, emotion: e.detail.emotion, playSource: e.detail.playSource } }));
+    });
+    this.bus.addEventListener('request-vrma-list', (e) => e.detail.callback(this.vrmaLibrary.map(item => item.name)));
+    this.bus.addEventListener('vrma-finished', () => this.handlePlaylistSequence());
+  }
+
+  async initDB() {
+    await DBManager.init();
+    const savedVrm = await DBManager.getFile('saved_vrm');
+    
+    if(savedVrm) { 
+        document.getElementById('vrm-local-info').innerText = `✅ 保存済み: ${savedVrm.name}`; 
+        const btn = document.getElementById('btn-load-local-vrm');
+        btn.style.display = 'block';
+        btn.onclick = () => this.bus.dispatchEvent(new CustomEvent('vrm-load', { detail: { buffer: savedVrm.data } }));
+        setTimeout(() => this.bus.dispatchEvent(new CustomEvent('vrm-load', { detail: { buffer: savedVrm.data } })), 500);
+    }
+    
+    const savedVrmaList = await DBManager.getAll('vrma');
+    if(savedVrmaList.length > 0) { 
+        for (const item of savedVrmaList) await this.loadVRMAFromBuffer(item.id, item.name, item.data); 
+        this.updateLibraryUI(); 
+        try {
+            const savedPlaylistIds = JSON.parse(localStorage.getItem('vrm_playlist_v2') || '[]');
+            savedPlaylistIds.forEach(id => {
+                const libItem = this.vrmaLibrary.find(v => v.id === id);
+                if (libItem) this.playlist.push({ ...libItem });
+            });
+            this.updatePlaylistUI();
+        } catch(e) {}
+    }
+  }
+
+  savePlaylist() { localStorage.setItem('vrm_playlist_v2', JSON.stringify(this.playlist.map(item => item.id))); }
+
+  initUI() {
+    this.uiToggle.addEventListener('click', () => this.uiContainer.classList.toggle('hidden'));
+    document.getElementById('settings-btn').addEventListener('click', () => document.getElementById('settings-panel').classList.toggle('open'));
+    document.getElementById('close-settings').addEventListener('click', () => document.getElementById('settings-panel').classList.remove('open'));
+
+    document.getElementById('vrm-input').addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (f) { 
+          const buf = await f.arrayBuffer(); await DBManager.saveFile('saved_vrm', f.name, buf, 'vrm'); 
+          document.getElementById('vrm-local-info').innerText = `✅ 保存済み: ${f.name}`; 
+          const btn = document.getElementById('btn-load-local-vrm');
+          btn.style.display = 'block';
+          btn.onclick = () => this.bus.dispatchEvent(new CustomEvent('vrm-load', { detail: { buffer: buf } }));
+          this.bus.dispatchEvent(new CustomEvent('vrm-load', { detail: { buffer: buf } })); 
+      }
+    });
+
+    document.getElementById('vrma-input').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files); if (files.length === 0) return;
+      for(const f of files) { const buf = await f.arrayBuffer(); const dbId = `vrma_${Date.now()}_${f.name}`; await DBManager.saveFile(dbId, f.name, buf, 'vrma'); await this.loadVRMAFromBuffer(dbId, f.name, buf); }
+      this.updateLibraryUI(); e.target.value = ''; window.showToast('モーションを登録しました');
+    });
+
+    document.getElementById('clear-lib-btn').addEventListener('click', async () => {
+      for (const item of this.vrmaLibrary) await DBManager.deleteFile(item.id);
+      this.vrmaLibrary = []; this.playlist = []; this.savePlaylist(); this.updateLibraryUI(); this.updatePlaylistUI(); window.showToast('全データを削除しました');
+    });
+    
+    ['chk-sequence', 'chk-loop'].forEach(id => {
+        const el = document.getElementById(id); const val = localStorage.getItem('vrm_' + id);
+        if (val !== null) el.checked = (val === 'true');
+        el.addEventListener('change', () => localStorage.setItem('vrm_' + id, el.checked));
+    });
+  }
+
+  async loadVRMAFromBuffer(dbId, fileName, buffer) {
+    const baseName = fileName.replace('.vrma', '');
+    if (this.vrmaLibrary.find(v => v.name === baseName)) return;
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const gltfLoader = new GLTFLoader(); gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+    try {
+      const gltf = await gltfLoader.loadAsync(url);
+      if (gltf.userData.vrmAnimations?.length > 0) this.vrmaLibrary.push({ id: dbId, name: baseName, animClip: gltf.userData.vrmAnimations[0] });
+    } catch (err) { console.error(err); }
+    URL.revokeObjectURL(url);
+  }
+
+  initControllers() {
+    const widget = document.getElementById('dpad-widget'); const handle = document.getElementById('dpad-handle');
+    const toggle = document.getElementById('dpad-toggle'); const panel = document.getElementById('dpad-panel');
+
+    toggle.addEventListener('click', () => panel.classList.toggle('hidden'));
+    
+    panel.addEventListener('pointerdown', (e) => e.stopPropagation());
+    panel.addEventListener('pointerup', (e) => e.stopPropagation());
+
+    let isDragging = false; let startX, startY, initX, initY;
+    handle.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); 
+        isDragging = true; startX = e.clientX; startY = e.clientY;
+        const rect = widget.getBoundingClientRect(); initX = rect.left; initY = rect.top;
+        handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        let newX = initX + (e.clientX - startX); let newY = initY + (e.clientY - startY);
+        newX = Math.max(0, Math.min(newX, window.innerWidth - 60)); newY = Math.max(0, Math.min(newY, window.innerHeight - 60));
+        widget.style.left = `${newX}px`; widget.style.top = `${newY}px`; widget.style.bottom = 'auto'; widget.style.right = 'auto';
+    });
+    const endDrag = () => { isDragging = false; }; handle.addEventListener('pointerup', endDrag); handle.addEventListener('pointercancel', endDrag);
+
+    const bindDpad = (id, dir) => {
+        const btn = document.getElementById(id);
+        const start = (e) => { 
+            e.preventDefault(); e.stopPropagation(); 
+            if (panel.classList.contains('hidden')) return; 
+            this.bus.dispatchEvent(new CustomEvent('vrm-move-start', { detail: { dir } })); 
+        };
+        const stop = (e) => { 
+            e.preventDefault(); e.stopPropagation(); 
+            if (panel.classList.contains('hidden')) return; 
+            this.bus.dispatchEvent(new CustomEvent('vrm-move-stop')); 
+        };
+        btn.addEventListener('pointerdown', start); btn.addEventListener('pointerup', stop); btn.addEventListener('pointerleave', stop); btn.addEventListener('pointercancel', stop);
+    };
+    bindDpad('btn-up', 'up'); bindDpad('btn-down', 'down'); bindDpad('btn-left', 'left'); bindDpad('btn-right', 'right');
+    document.getElementById('btn-jump').addEventListener('pointerdown', (e) => { 
+        e.preventDefault(); e.stopPropagation(); 
+        if (panel.classList.contains('hidden')) return; 
+        this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: 'jump' } })); 
+    });
+  }
+
+  updateLibraryUI() {
+    this.libraryContainer.innerHTML = '';
+    this.vrmaLibrary.forEach((item, index) => {
+      const div = document.createElement('div'); div.className = 'playlist-item';
+      const nameSpan = document.createElement('span'); nameSpan.className = 'playlist-name'; nameSpan.textContent = item.name;
+      nameSpan.onclick = async () => { const newName = prompt('リネーム:', item.name); if (newName) { item.name = newName; const fd = await DBManager.getFile(item.id); if(fd) { fd.name = newName + '.vrma'; await DBManager.saveFile(fd.id, fd.name, fd.data, fd.type); } this.updateLibraryUI(); this.updatePlaylistUI(); } };
+
+      const ctrlDiv = document.createElement('div'); ctrlDiv.className = 'playlist-controls';
+      const playBtn = document.createElement('button'); playBtn.textContent = '▶'; playBtn.onclick = () => { this.uiContainer.classList.add('hidden'); this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: item.name, animClip: item.animClip, playSource: 'single' } })); };
+      
+      const addBtn = document.createElement('button'); addBtn.textContent = '＋ 追加'; 
+      addBtn.onclick = () => { this.playlist.push({...item}); this.savePlaylist(); this.updatePlaylistUI(); };
+      
+      const delBtn = document.createElement('button'); delBtn.textContent = '×'; delBtn.style.borderColor = 'var(--accent-danger)'; 
+      delBtn.onclick = async () => { await DBManager.deleteFile(item.id); this.vrmaLibrary.splice(index, 1); this.playlist = this.playlist.filter(p => p.id !== item.id); this.savePlaylist(); this.updateLibraryUI(); this.updatePlaylistUI(); };
+
+      ctrlDiv.appendChild(playBtn); ctrlDiv.appendChild(addBtn); ctrlDiv.appendChild(delBtn); div.appendChild(nameSpan); div.appendChild(ctrlDiv); this.libraryContainer.appendChild(div);
+    });
+  }
+
+  updatePlaylistUI() {
+    this.playlistContainer.innerHTML = '';
+    this.playlist.forEach((item, index) => {
+      const div = document.createElement('div'); div.className = 'playlist-item';
+      if (index === this.currentPlayIndex) div.classList.add('active');
+
+      const nameSpan = document.createElement('span'); nameSpan.className = 'playlist-name'; nameSpan.textContent = `${index+1}. ${item.name}`;
+
+      const ctrlDiv = document.createElement('div'); ctrlDiv.className = 'playlist-controls';
+      const playBtn = document.createElement('button'); playBtn.textContent = '▶'; 
+      playBtn.onclick = () => { this.currentPlayIndex = index; this.updatePlaylistUI(); this.uiContainer.classList.add('hidden'); this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: item.name, animClip: item.animClip, playSource: 'playlist' } })); };
+      
+      const delBtn = document.createElement('button'); delBtn.textContent = '削除'; 
+      delBtn.onclick = () => { this.playlist.splice(index, 1); this.savePlaylist(); this.updatePlaylistUI(); };
+
+      ctrlDiv.appendChild(playBtn); ctrlDiv.appendChild(delBtn); div.appendChild(nameSpan); div.appendChild(ctrlDiv); this.playlistContainer.appendChild(div);
+    });
+  }
+
+  handlePlaylistSequence() {
+    const isSeq = document.getElementById('chk-sequence').checked;
+    const isLoop = document.getElementById('chk-loop').checked;
+
+    if (isSeq && this.currentPlayIndex >= 0 && this.playlist.length > 0) {
+        this.currentPlayIndex++;
+        if (this.currentPlayIndex >= this.playlist.length) {
+            if (isLoop) this.currentPlayIndex = 0; else { this.currentPlayIndex = -1; this.updatePlaylistUI(); return; }
+        }
+        const nextItem = this.playlist[this.currentPlayIndex];
+        this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: nextItem.name, animClip: nextItem.animClip, playSource: 'playlist' } }));
+        this.updatePlaylistUI();
+    } else if (isLoop && this.currentPlayIndex >= 0) {
+        const item = this.playlist[this.currentPlayIndex];
+        this.bus.dispatchEvent(new CustomEvent('vrm-action', { detail: { actionName: item.name, animClip: item.animClip, playSource: 'playlist' } }));
+    } else {
+        this.currentPlayIndex = -1; this.updatePlaylistUI();
+    }
+  }
+}
+
+const llmModule = new LLMModule(eventBus);
+const vrmModule = new VRMModule(eventBus);
+const extensionModule = new ExtensionModule(eventBus);
+
+</script>
+</body>
+</html>
+
+
