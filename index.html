@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>AI System & VRM Integrated Studio v2.12.18</title>
+<title>AI System & VRM Integrated Studio v2.12.20</title>
 <style>
   :root {
     --bg-glass: rgba(18, 20, 28, 0.65);
@@ -75,6 +75,8 @@
   #btn-up { grid-column: 2; grid-row: 1; } #btn-left { grid-column: 1; grid-row: 2; } #btn-jump { grid-column: 2; grid-row: 2; font-size: 10px; font-weight: bold; background: rgba(62,214,196,0.2); color: var(--accent-primary); } #btn-right { grid-column: 3; grid-row: 2; } #btn-down { grid-column: 2; grid-row: 3; }
 
   #chat-wrapper { position: absolute; bottom: 90px; left: 16px; width: min(100% - 32px, 500px); height: calc(100vh - 200px); max-height: 40vh; z-index: 40; display: flex; flex-direction: column; gap: 8px; pointer-events: none; transition: opacity 0.3s; }
+  /* チャットUI非表示用クラス */
+  #chat-wrapper.hidden { display: none !important; }
   #chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 8px; pointer-events: auto; -webkit-overflow-scrolling: touch; }
   .msg-bubble { max-width: 90%; padding: 10px 14px; border-radius: 16px; font-size: 13px; line-height: 1.5; word-break: break-word; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: auto; }
   .msg-bubble.user { align-self: flex-end; background: rgba(255,255,255,0.95); color: #1a1a1a; border-bottom-right-radius: 4px; }
@@ -90,6 +92,8 @@
   .send-btn { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; border: none; background: var(--accent-primary); color: #000; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
   #live-wrapper { position: absolute; bottom: 90px; left: 16px; width: min(100% - 32px, 500px); max-height: 45vh; z-index: 40; display: none; flex-direction: column; gap: 12px; pointer-events: none; }
+  /* LiveUI非表示用クラス */
+  #live-wrapper.hidden-override { display: none !important; }
   body.is-live #chat-wrapper { display: flex; opacity: 0.8; }
   body.is-live #input-bar { display: none; }
   body.is-live.show-captions #live-wrapper { display: flex; }
@@ -146,13 +150,12 @@
 </script>
 </head>
 <body>
-
   <div id="toastBox"></div>
   <div id="top-bar">
     <div id="status-pill" class="glass"><div id="statusLed" class="led listening"></div><span id="statusLabel">待機中</span></div>
   </div>
 
-  <button id="vrm-ui-toggle">≡ 3D設定 <span style="font-size: 10px; background: var(--accent-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">v2.12.18</span></button>
+  <button id="vrm-ui-toggle">≡ 3D設定 <span style="font-size: 10px; background: var(--accent-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">v2.12.20</span></button>
   <div id="vrm-ui-container" class="hidden">
     <div class="vrm-form-group">
       <label>1. VRMモデル読み込み</label>
@@ -201,6 +204,10 @@
   <div id="bottom-dock" class="glass">
     <button class="dock-btn" id="settings-btn" title="システム設定">⚙️</button>
     <button class="dock-btn" id="dpad-toggle" title="アクションパッド切替">🕹️</button>
+    <!-- 追加機能: チャット表示切替ボタン -->
+    <button class="dock-btn" id="chat-toggle-btn" title="UI表示切替">💬</button>
+    <!-- 追加機能: カメラ位置切替ボタン -->
+    <button class="dock-btn" id="camera-toggle-btn" title="カメラ位置切替">🎥</button>
     <div style="width: 1px; height: 24px; background: var(--border-glass); margin: 0 4px;"></div>
     <button id="live-toggle-btn"><span>● LIVE API</span></button>
   </div>
@@ -334,10 +341,8 @@ class LLMModule {
     this.activeTtsNodes = []; 
     this.silenceTimer = null; 
 
-    // LiveAPIからの純正テキストログを保持するバッファ
     this.currentAiResponseBuffer = '';
     
-    // ローカルSTTエンジン
     this.recognition = null;
     this.initSTT();
 
@@ -360,6 +365,11 @@ class LLMModule {
     
     this.recognition.onresult = (e) => {
         if (!this.isLiveMode) return;
+        
+        // ★ エコー防止判定：AI発話中かチェック
+        const currentLed = document.getElementById('statusLed').className;
+        const isEchoing = (this.activeTtsNodes.length > 0 || currentLed.includes('speaking'));
+
         let interimTranscript = '';
         let finalTranscript = '';
 
@@ -368,13 +378,14 @@ class LLMModule {
             else interimTranscript += e.results[i][0].transcript;
         }
         
-        // オプションがONの時のみ生データを字幕表示
+        // オプションがONかつAI発話中でない時のみ字幕と処理を更新
         if (document.getElementById('show-live-captions').checked) {
-            if (interimTranscript) this.updateLiveCaptionStreaming('user', interimTranscript, true);
-            if (finalTranscript) this.updateLiveCaptionStreaming('user', finalTranscript, false);
+            if (interimTranscript && !isEchoing) this.updateLiveCaptionStreaming('user', interimTranscript, true);
+            if (finalTranscript && !isEchoing) this.updateLiveCaptionStreaming('user', finalTranscript, false);
         }
 
-        if (finalTranscript) {
+        // STTからのFlash-liteへの判定ルーティング
+        if (finalTranscript && !isEchoing) {
             this.processWithLiteModel(finalTranscript);
         }
     };
@@ -505,6 +516,14 @@ class LLMModule {
     document.getElementById('btn-export-log').addEventListener('click', () => dlJson(this.chatHistory, 'vrm_chatlog.json'));
     
     document.getElementById('btn-clear-memory').addEventListener('click', () => { this.chatHistory = []; this.relationMemory = {}; localStorage.removeItem('vrm_chatLog'); localStorage.removeItem('vrm_memory'); this.historyDiv.innerHTML = ''; this.qrDiv.innerHTML = ''; window.showToast('データをリセットしました'); });
+
+    // UI(チャット文字)表示/非表示トグルボタンのイベント
+    document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+        document.getElementById('chat-wrapper').classList.toggle('hidden');
+        document.getElementById('live-wrapper').classList.toggle('hidden-override');
+        const btn = document.getElementById('chat-toggle-btn');
+        btn.style.opacity = document.getElementById('chat-wrapper').classList.contains('hidden') ? '0.5' : '1';
+    });
   }
 
   setStatus(s) { 
@@ -735,9 +754,12 @@ class LLMModule {
       this.liveWorklet.port.onmessage = (e) => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
         const { buffer, rms } = e.data;
-        const currentLed = document.getElementById('statusLed').className;
         
-        if (!currentLed.includes('speaking')) {
+        // ★ エコー防止：AI発話中か判定
+        const currentLed = document.getElementById('statusLed').className;
+        const isEchoing = (this.activeTtsNodes.length > 0 || currentLed.includes('speaking'));
+
+        if (!isEchoing) {
             if (rms > 0.02) {
                 if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
                 if (!currentLed.includes('listening')) { this.setStatus('listening'); }
@@ -750,7 +772,13 @@ class LLMModule {
 
         const uint8 = new Uint8Array(buffer); 
         let binary = ''; 
-        for(let i=0; i<uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        
+        // ★ エコー防止：発話中は無音(0)データを送ることで通信を維持しつつ自分の声を拾わせない
+        if (isEchoing) {
+            for(let i=0; i<uint8.length; i++) binary += String.fromCharCode(0);
+        } else {
+            for(let i=0; i<uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        }
         
         this.ws.send(JSON.stringify({ 
             realtimeInput: { audio: { data: btoa(binary), mimeType: 'audio/pcm;rate=16000' } } 
@@ -867,6 +895,8 @@ class VRMModule {
     this.noiseTime = Math.random() * 100;
     this.scene.add(this.lookAtTarget);
 
+    this.cameraState = 0; // 0: デフォルト, 1: 全身, 2: 遠景
+
     this.initThree(); this.initLoaders(); this.createEnvironment();
     this.animate = this.animate.bind(this); requestAnimationFrame(this.animate);
 
@@ -910,6 +940,30 @@ class VRMModule {
     this.bus.addEventListener('vrm-move-stop', () => { this.continuousMoveDir = null; });
   }
 
+  // ★ 追加機能: カメラ位置のトグル切り替え
+  toggleCamera() {
+      this.cameraState = (this.cameraState + 1) % 3;
+      if (this.cameraState === 0) {
+          // デフォルト (バストアップ)
+          this.camera.position.set(0, 1.45, 1.5);
+          this.controls.target.set(0, 1.35, 0);
+      } else if (this.cameraState === 1) {
+          // 全身
+          this.camera.position.set(0, 1.0, 2.5);
+          this.controls.target.set(0, 0.8, 0);
+      } else if (this.cameraState === 2) {
+          // 遠景 (VRMaがよく見える)
+          this.camera.position.set(0, 1.2, 4.0);
+          this.controls.target.set(0, 1.0, 0);
+      }
+      this.dampedLookAtTarget.copy(this.camera.position);
+      
+      // ★ パン（二本指移動）などの自由操作を阻害しないよう、明示的にcontrolsを更新する
+      if (this.controls) this.controls.update();
+      
+      window.showToast(['カメラ位置: 標準', 'カメラ位置: 全身', 'カメラ位置: 遠景'][this.cameraState]);
+  }
+
   changeState(newState) { this.state = newState; }
 
   initThree() {
@@ -920,6 +974,7 @@ class VRMModule {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement); 
     this.controls.target.set(0, 1.35, 0); 
+    // ★ パン移動（二本指スワイプ等の自由移動）を有効化
     this.controls.enableDamping = true; this.controls.enablePan = true; this.controls.enableZoom = true;
     
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -1461,8 +1516,11 @@ const llmModule = new LLMModule(eventBus);
 const vrmModule = new VRMModule(eventBus);
 const extensionModule = new ExtensionModule(eventBus);
 
+// ★ 追加: カメラ切替ボタンのイベントバインド
+document.getElementById('camera-toggle-btn').addEventListener('click', () => {
+    vrmModule.toggleCamera();
+});
+
 </script>
 </body>
 </html>
-
-
